@@ -97,3 +97,31 @@ app.post('/messages', async (req,res) => {
         mongo.close();
     }
 });
+
+app.get('/messages', async (req, res) => {
+
+    const {user} = req.headers;
+    const {limit} = req.query;
+    try {
+        await mongo.connect();
+        const messages = getMessages();
+        const conditions = {$or:[
+            {from:user},
+            {to:user},
+            {to:'Todos'}
+        ]};
+        const userMessages = await messages.find(conditions).toArray();
+        if (typeof limit === 'string') {
+            const end = userMessages.length-1;
+            const start = end-parseInt(limit);
+            const result = userMessages.slice(start,end);
+            res.status(201).send(result);
+        } else {
+            res.status(201).send(userMessages);
+        }
+    } catch (e) {
+        res.sendStatus(500);
+    } finally {
+        mongo.close();
+    }
+});
