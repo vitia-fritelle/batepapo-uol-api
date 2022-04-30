@@ -1,11 +1,10 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
-import dayjs from 'dayjs';
 import express from 'express';
 import mongo from './utils';
 
 import {json} from 'express';
-import {nameSchema} from './schemas';
+import {messageSchema, nameSchema} from './schemas';
 import {Message, Participant} from './entities';
 import {existsParticipant, getMessages, getParticipants} from './utils';
 
@@ -37,10 +36,9 @@ app.post('/participants', async (req,res) => {
             return res.sendStatus(409);
         }
 
-        await participants.insertOne(new Participant(name,Date.now()));
+        await participants.insertOne(new Participant(name));
         await messages.insertOne(
-            new Message(name,'Todos','entra na sala...','status',
-            dayjs().format('HH:mm:ss'))
+            new Message(name,'Todos','entra na sala...','status')
         );
         res.sendStatus(201);
     } catch(e) {
@@ -51,6 +49,7 @@ app.post('/participants', async (req,res) => {
 })
 
 app.get('/participants', async (_,res) => {
+
     try {
         await mongo.connect();
         const participants = await getParticipants().find().toArray();
@@ -61,3 +60,40 @@ app.get('/participants', async (_,res) => {
         mongo.close();
     }
 })
+
+app.post('/messages', async (req,res) => {
+
+    const {to,text,type} = req.body;
+    const {user: from} = req.headers;
+    let message: Message;
+    if (typeof from === 'string') {
+        const validation = messageSchema.validate(
+            {from,to,text,type}, 
+            {abortEarly:true}
+        );
+        if (validation.error) {
+            return res.sendStatus(422);
+        } else {
+            message = new Message(from, to, text, type);
+        }
+    } else {
+        return res.sendStatus(422);
+    }
+    try {
+        await mongo.connect();
+        const participants = getParticipants();
+        const messages = getMessages();
+        const size = await participants.estimatedDocumentCount();
+        if (size === 0) {
+            mongo.close();
+            return res.sendStatus(422);
+        } else {
+            await messages.insertOne(message);
+            res.sendStatus(201);
+        }
+    } catch (e) {
+        res.sendStatus(500);
+    } finally {
+        mongo.close();
+    }
+});
