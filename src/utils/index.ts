@@ -9,13 +9,13 @@ export const existsParticipant = async (participants: Collection, name: string) 
     return await participants.findOne({name})?true:false;
 }
 
-export const getParticipants = async () => {
+export const getParticipants = () => {
     
     const participants = mongo.db('batepapo-uol').collection('participants');
     return participants;
 }
 
-export const getMessages = async () => {
+export const getMessages = () => {
    
     const messages = mongo.db('batepapo-uol').collection('messages');
     return messages;

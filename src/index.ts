@@ -29,8 +29,8 @@ app.post('/participants', async (req,res) => {
     }
     try {
         await mongo.connect();
-        const participants = await getParticipants();
-        const messages = await getMessages();
+        const participants = getParticipants();
+        const messages = getMessages();
 
         if (await existsParticipant(participants, name)) {
             mongo.close();
@@ -44,6 +44,18 @@ app.post('/participants', async (req,res) => {
         );
         res.sendStatus(201);
     } catch(e) {
+        res.sendStatus(500);
+    } finally {
+        mongo.close();
+    }
+})
+
+app.get('/participants', async (_,res) => {
+    try {
+        await mongo.connect();
+        const participants = await getParticipants().find().toArray();
+        res.status(201).send(participants);
+    } catch (e) {
         res.sendStatus(500);
     } finally {
         mongo.close();
