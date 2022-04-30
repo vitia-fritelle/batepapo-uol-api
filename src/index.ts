@@ -14,10 +14,10 @@ const app = express();
 
 app.use(cors(), json());
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || '5000';
 app.listen(port, () => 
     console.log(`O servidor está escutando na porta https://localhost:${port}`)
-)
+);
 
 app.post('/participants', async (req,res) => {
     
@@ -25,26 +25,27 @@ app.post('/participants', async (req,res) => {
     const validation = nameSchema.validate({name}, {abortEarly: true});
     if (validation.error) {
         return res.sendStatus(402);
-    }
-    try {
-        await mongo.connect();
-        const participants = getParticipants();
-        const messages = getMessages();
-
-        if (await existsParticipant(participants, name)) {
+    } else {
+        try {
+            await mongo.connect();
+            const participants = getParticipants();
+            const messages = getMessages();
+    
+            if (await existsParticipant(participants, name)) {
+                mongo.close();
+                return res.sendStatus(409);
+            } else {
+                await participants.insertOne(new Participant(name));
+                await messages.insertOne(
+                    new Message(name,'Todos','entra na sala...','status')
+                );
+                res.sendStatus(201);
+            }
+        } catch(e) {
+            res.sendStatus(500);
+        } finally {
             mongo.close();
-            return res.sendStatus(409);
         }
-
-        await participants.insertOne(new Participant(name));
-        await messages.insertOne(
-            new Message(name,'Todos','entra na sala...','status')
-        );
-        res.sendStatus(201);
-    } catch(e) {
-        res.sendStatus(500);
-    } finally {
-        mongo.close();
     }
 })
 
@@ -65,7 +66,6 @@ app.post('/messages', async (req,res) => {
 
     const {to,text,type} = req.body;
     const {user: from} = req.headers;
-    let message: Message;
     if (typeof from === 'string') {
         const validation = messageSchema.validate(
             {from,to,text,type}, 
@@ -74,27 +74,27 @@ app.post('/messages', async (req,res) => {
         if (validation.error) {
             return res.sendStatus(422);
         } else {
-            message = new Message(from, to, text, type);
+            const message = new Message(from, to, text, type);
+            try {
+                await mongo.connect();
+                const participants = getParticipants();
+                const messages = getMessages();
+                const size = await participants.estimatedDocumentCount();
+                if (size === 0) {
+                    mongo.close();
+                    return res.sendStatus(422);
+                } else {
+                    await messages.insertOne(message);
+                    res.sendStatus(201);
+                }
+            } catch (e) {
+                res.sendStatus(500);
+            } finally {
+                mongo.close();
+            }
         }
     } else {
         return res.sendStatus(422);
-    }
-    try {
-        await mongo.connect();
-        const participants = getParticipants();
-        const messages = getMessages();
-        const size = await participants.estimatedDocumentCount();
-        if (size === 0) {
-            mongo.close();
-            return res.sendStatus(422);
-        } else {
-            await messages.insertOne(message);
-            res.sendStatus(201);
-        }
-    } catch (e) {
-        res.sendStatus(500);
-    } finally {
-        mongo.close();
     }
 });
 
@@ -125,3 +125,56 @@ app.get('/messages', async (req, res) => {
         mongo.close();
     }
 });
+
+app.post('/status', async (req,res) => {
+
+    const {user: name} = req.headers;
+    const validation = nameSchema.validate({name},{abortEarly:true});
+    if (validation.error) {
+        return res.sendStatus(402);
+    } else {
+        try {
+            await mongo.connect();
+            const participants = getParticipants();
+            const user = await participants.findOne({name});
+            if (user) {
+                await participants.updateOne(
+                    {_id: user._id},
+                    {$set: {lastStatus: Date.now()}}
+                );
+                res.sendStatus(200);
+            } else {
+                mongo.close();
+                return res.sendStatus(404);
+            }
+        } catch (e) {
+            res.sendStatus(500);
+        } finally {
+            mongo.close();
+        }
+    }
+});
+
+const autoRemove = async () => {
+    
+    try {
+        await mongo.connect();
+        const participants = getParticipants();
+        const messages = getMessages();
+        const condition = {lastStatus: {$lt: Date.now()-10000}};
+        const inactives = await participants.find(condition).toArray();
+        if(inactives.length !== 0) {
+            const exitMessages = inactives.map(({name}) => {
+                return new Message(name,'Todos','sai da sala...','status');
+            });
+            await participants.deleteMany(condition);
+            await messages.insertMany(exitMessages);
+        } 
+    } catch (e) {
+        console.log(e);
+    } finally {
+        mongo.close()
+    }
+};
+
+setInterval(autoRemove,15000);
