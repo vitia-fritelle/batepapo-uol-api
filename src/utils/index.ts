@@ -1,5 +1,6 @@
 import {Collection, MongoClient} from "mongodb";
 import {Message,Participant} from "../entities";
+import {stripHtml} from 'string-strip-html';
 
 const mongo_url = 'mongodb://localhost:27017';
 const mongo = new MongoClient(mongo_url);
@@ -24,3 +25,5 @@ export const getMessages = () => {
     const messages = mongo.db('batepapo-uol').collection<Message>('messages');
     return messages;
 }
+
+export const removeHTML = (name: string) => stripHtml(name).result;
