@@ -36,11 +36,11 @@ export const getMessages = () => {
 export const removeHTML = (name: string) => stripHtml(name).result;
 
 export const getParticipantsNames = async () => {
+    
     await mongo.connect();
     const result = (
         await getParticipants().find().toArray()
     ).map(({name}) => name);
-    mongo.close();
     return result;
 };
 
@@ -64,7 +64,5 @@ export const autoRemove = async () => {
             'Erro na remoção automática\n'
             +`${e}`
         );
-    } finally {
-        mongo.close()
     }
 };

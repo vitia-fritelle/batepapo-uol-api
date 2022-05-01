@@ -41,7 +41,6 @@ app.post('/participants', async (req,res) => {
             const messages = getMessages();
             
             if (await existsParticipant(participants, name)) {
-                mongo.close();
                 logger.error(
                     'Erro em post/participants\n'
                     +'O usuário já existe!'
@@ -60,8 +59,6 @@ app.post('/participants', async (req,res) => {
                 +`${e}`
             );
             res.sendStatus(500);
-        } finally {
-            mongo.close();
         }
     }
 });
@@ -78,8 +75,6 @@ app.get('/participants', async (_,res) => {
             +`${e}`
         );
         res.sendStatus(500);
-    } finally {
-        mongo.close();
     }
 });
 
@@ -111,7 +106,6 @@ app.post('/messages', async (req,res) => {
                 const messages = getMessages();
                 const size = await participants.estimatedDocumentCount();
                 if (size === 0) {
-                    mongo.close();
                     logger.error(
                         'Erro em get/messages\n'
                         +'Não há participantes logados!'
@@ -127,8 +121,6 @@ app.post('/messages', async (req,res) => {
                     +`${e}`
                 );
                 res.sendStatus(500);
-            } finally {
-                mongo.close();
             }
         }
     } else {
@@ -169,8 +161,6 @@ app.get('/messages', async (req, res) => {
                 +`${e}`
             );
             res.sendStatus(500);
-        } finally {
-            mongo.close();
         }
     } else {
         logger.error(
@@ -217,8 +207,6 @@ app.delete('/messages/:messageId', async (req,res) => {
                 +`${e}`
             );
             res.sendStatus(404);
-        } finally {
-            mongo.close();
         }
     } else {
         logger.error(
@@ -283,8 +271,6 @@ app.put('/messages/:messageId', async (req,res) => {
                     +`${e}`
                 );
                 res.sendStatus(500);
-            } finally {
-                mongo.close();
             }
         }
     } else {
@@ -320,7 +306,6 @@ app.post('/status', async (req,res) => {
                     );
                     res.sendStatus(200);
                 } else {
-                    mongo.close();
                     logger.error(
                         'Erro em post/status\n'
                         +'Usuário inexistente'
@@ -333,8 +318,6 @@ app.post('/status', async (req,res) => {
                     +`${e}`
                 );
                 res.sendStatus(500);
-            } finally {
-                mongo.close();
             }
         }
     } else {
