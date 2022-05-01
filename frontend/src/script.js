@@ -4,6 +4,7 @@ let nome;
 let destinatario = "Todos";
 let tipoMensagem = "message";
 let buscarMensagens = true;
+const path = 'https://projeto12-batepapo-uol-api.herokuapp.com';
 
 perguntarNome();
 
@@ -14,7 +15,7 @@ function perguntarNome() {
 
 function registrarParticipante() {
   const dados = { name: nome };
-  const requisicao = axios.post("http://localhost:5000/participants", dados);
+  const requisicao = axios.post(path+"/participants", dados);
   requisicao.then((response) => {
     nome = response.data.name || nome;
     entrarNaSala();
@@ -33,7 +34,7 @@ function entrarNaSala() {
 function carregarMensagens() {
   if (!buscarMensagens) return;
 
-  const requisicao = axios.get("http://localhost:5000/messages?limit=50", {
+  const requisicao = axios.get(path+"/messages?limit=50", {
     headers: {
       User: nome
     }
@@ -42,7 +43,7 @@ function carregarMensagens() {
 }
 
 function carregarParticipantes() {
-  const requisicao = axios.get("http://localhost:5000/participants", {
+  const requisicao = axios.get(path+"/participants", {
     headers: {
       User: nome
     }
@@ -63,7 +64,7 @@ function agendarAtualizacaoDeStatus() {
 }
 
 function atualizarStatus() {
-  axios.post("http://localhost:5000/status", {}, {
+  axios.post(path+"/status", {}, {
     headers: {
       User: nome
     }
@@ -109,7 +110,7 @@ function enviarMensagem() {
   });
   renderizarMensagens();
 
-  const requisicao = axios.post("http://localhost:5000/messages", dados, {
+  const requisicao = axios.post(path+"/messages", dados, {
     headers: {
       User: nome
     }
@@ -281,7 +282,7 @@ function enviarMensagemEditada(event, id) {
     conteudoMensagem.innerHTML = oldHtml;
     conteudoMensagem.querySelector(".text").innerHTML = newMessage;
 
-    axios.put(`http://localhost:5000/messages/${id}`, {
+    axios.put(path+`/messages/${id}`, {
       to: mensagem.to,
       text: newMessage,
       type: mensagem.type
@@ -302,7 +303,7 @@ function excluirMensagem(id) {
   const confirmacao = confirm("Deseja realmente excluir esta mensagem?");
 
   if (confirmacao) {
-    axios.delete(`http://localhost:5000/messages/${id}`, {
+    axios.delete(path+`/messages/${id}`, {
       headers: {
         User: nome
       }

@@ -9,6 +9,7 @@ dotenvConfig();
 const mongo_url = process.env.MONGO_URL || 'mongodb://localhost:27017';
 const mongo = new MongoClient(mongo_url);
 
+
 export default mongo;
 
 export const existsParticipant = async (
