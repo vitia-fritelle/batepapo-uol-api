@@ -1,14 +1,15 @@
 import cors from 'cors';
-import dotenv from 'dotenv';
 import express from 'express';
 import mongo from './utils';
 
+import {ObjectId} from 'mongodb';
 import {Message, Participant} from './entities';
+import {config as dotenvConfig} from 'dotenv';
 import {json} from 'express';
 import {messageSchema, nameSchema} from './schemas';
-import {existsParticipant, getMessages, getParticipants, removeHTML} from './utils';
+import {existsParticipant, getMessages, getParticipants, removeHTML, autoRemove} from './utils';
 
-dotenv.config();
+dotenvConfig();
 
 const app = express();
 
@@ -18,7 +19,6 @@ const port = process.env.PORT || '5000';
 app.listen(port, () => 
     console.log(`O servidor está escutando na porta https://localhost:${port}`)
 );
-
 
 app.post('/participants', async (req,res) => {
     
@@ -48,7 +48,7 @@ app.post('/participants', async (req,res) => {
             mongo.close();
         }
     }
-})
+});
 
 app.get('/participants', async (_,res) => {
 
@@ -61,7 +61,7 @@ app.get('/participants', async (_,res) => {
     } finally {
         mongo.close();
     }
-})
+});
 
 app.post('/messages', async (req,res) => {
 
@@ -73,7 +73,7 @@ app.post('/messages', async (req,res) => {
     let from = req.headers.user;
     if (typeof from === 'string') {
         from = removeHTML(from).trim(); 
-        const validation = messageSchema.validate(
+        const validation = (await messageSchema()).validate(
             {from,to,text,type}, 
             {abortEarly:true}
         );
@@ -137,6 +137,85 @@ app.get('/messages', async (req, res) => {
     }
 });
 
+app.delete('/messages/:messageId', async (req,res) => {
+
+    let {user} = req.headers;
+    const {messageId} = req.params;
+    if (typeof user === 'string') {
+        user = removeHTML(user).trim();
+        try {
+            await mongo.connect();
+            const messages = getMessages();
+            const _id = new ObjectId(messageId);
+            const message = await messages.findOne({_id});
+            
+            if (message) {
+                if (message.from === user) {
+                    await messages.deleteOne({_id});
+                    res.sendStatus(200);
+                } else {
+                    res.sendStatus(401);
+                }
+            } else {
+                res.sendStatus(404);
+            }
+        } catch (e) {
+            res.sendStatus(404);
+        } finally {
+            mongo.close();
+        }
+    } else {
+        res.sendStatus(422);
+    }
+});
+
+app.put('/messages/:messageId', async (req,res) => {
+
+    const {to,text,type} = {
+        to:removeHTML(req.body.to).trim(),
+        text:removeHTML(req.body.text).trim(),
+        type:removeHTML(req.body.type).trim()
+    };
+    let from = req.headers.user;
+    const {messageId} = req.params;
+    if (typeof from === 'string') {
+        from = removeHTML(from).trim(); 
+        const validation = (await messageSchema()).validate(
+            {from,to,text,type}, 
+            {abortEarly:true}
+        );
+        if (validation.error) {
+            return res.sendStatus(422);
+        } else {
+            try {
+                await mongo.connect();
+                const messages = getMessages();
+                const _id = new ObjectId(messageId);
+                const message = await messages.findOne({_id});
+                if (message) {
+                    if (message.from === from) {
+                        await messages.updateOne(
+                            {_id},
+                            new Message(from,to,text,type)
+                        );
+                        res.sendStatus(200);
+                    } else {
+                        res.sendStatus(401);
+                    }
+                } else {
+                    res.sendStatus(404);
+                }
+            } catch (e) {
+                res.sendStatus(500);
+            } finally {
+                mongo.close();
+            }
+        }
+    } else {
+        return res.sendStatus(422);
+    }
+});
+
 app.post('/status', async (req,res) => {
 
     let name = req.headers.user;
@@ -170,27 +249,5 @@ app.post('/status', async (req,res) => {
         return res.sendStatus(422);
     }
 });
-
-const autoRemove = async () => {
-    
-    try {
-        await mongo.connect();
-        const participants = getParticipants();
-        const messages = getMessages();
-        const condition = {lastStatus: {$lt: Date.now()-10000}};
-        const inactives = await participants.find(condition).toArray();
-        if(inactives.length !== 0) {
-            const exitMessages = inactives.map(({name}) => {
-                return new Message(name,'Todos','sai da sala...','status');
-            });
-            await participants.deleteMany(condition);
-            await messages.insertMany(exitMessages);
-        } 
-    } catch (e) {
-        console.log(e);
-    } finally {
-        mongo.close()
-    }
-};
 
 setInterval(autoRemove,15000);

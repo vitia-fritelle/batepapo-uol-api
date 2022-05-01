@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type":"module",
   "scripts": {
-    "lint": "eslint . --ext .ts"
+    "start": "node --experimental-specifier-resolution=node ./build/index.js",
+    "lint": "eslint . --ext .ts",
+    "dev": "nodemon --experimental-specifier-resolution=node ./build/index.js"
   },
   "repository": {
     "type": "git",
