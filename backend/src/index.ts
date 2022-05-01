@@ -1,6 +1,8 @@
 import cors from 'cors';
 import express from 'express';
+import logger from './logging';
 import mongo from './utils';
+import chalk from 'chalk';
 
 import {ObjectId} from 'mongodb';
 import {Message, Participant} from './entities';
@@ -16,9 +18,14 @@ const app = express();
 
 app.use(cors(), json());
 
+const link_chalk = chalk.italic; 
+const message_chalk = chalk.rgb(142,125,190);
 const port = process.env.PORT || '5000';
 app.listen(port, () => 
-    console.log(`O servidor está escutando na porta https://localhost:${port}`)
+    console.log(
+        message_chalk('⚡[server] O servidor está escutando na porta:')
+        +link_chalk(` https://localhost:${port}`)
+    )
 );
 
 app.post('/participants', async (req,res) => {
@@ -32,9 +39,13 @@ app.post('/participants', async (req,res) => {
             await mongo.connect();
             const participants = getParticipants();
             const messages = getMessages();
-    
+            
             if (await existsParticipant(participants, name)) {
                 mongo.close();
+                logger.error(
+                    'Erro em post/participants\n'
+                    +'O usuário já existe!'
+                );
                 return res.sendStatus(409);
             } else {
                 await participants.insertOne(new Participant(name));
@@ -44,6 +55,10 @@ app.post('/participants', async (req,res) => {
                 res.sendStatus(201);
             }
         } catch(e) {
+            logger.error(
+                'Erro em post/participants\n'
+                +`${e}`
+            );
             res.sendStatus(500);
         } finally {
             mongo.close();
@@ -58,6 +73,10 @@ app.get('/participants', async (_,res) => {
         const participants = await getParticipants().find().toArray();
         res.status(201).send(participants);
     } catch (e) {
+        logger.error(
+            'Erro em get/participants\n'
+            +`${e}`
+        );
         res.sendStatus(500);
     } finally {
         mongo.close();
@@ -79,6 +98,10 @@ app.post('/messages', async (req,res) => {
             {abortEarly:true}
         );
         if (validation.error) {
+            logger.error(
+                'Erro em get/messages\n'
+                +'Passando dados em formato inapropriado'
+            );
             return res.sendStatus(422);
         } else {
             const message = new Message(from, to, text, type);
@@ -89,18 +112,30 @@ app.post('/messages', async (req,res) => {
                 const size = await participants.estimatedDocumentCount();
                 if (size === 0) {
                     mongo.close();
+                    logger.error(
+                        'Erro em get/messages\n'
+                        +'Não há participantes logados!'
+                    );
                     return res.sendStatus(422);
                 } else {
                     await messages.insertOne(message);
                     res.sendStatus(201);
                 }
             } catch (e) {
+                logger.error(
+                    'Erro em post/messages\n'
+                    +`${e}`
+                );
                 res.sendStatus(500);
             } finally {
                 mongo.close();
             }
         }
     } else {
+        logger.error(
+            'Erro em post/messages\n'
+            +'Passando headers em formato inapropriado'
+        );
         return res.sendStatus(422);
     }
 });
@@ -129,11 +164,19 @@ app.get('/messages', async (req, res) => {
                 res.status(201).send(userMessages);
             }
         } catch (e) {
+            logger.error(
+                'Erro em get/messages\n'
+                +`${e}`
+            );
             res.sendStatus(500);
         } finally {
             mongo.close();
         }
     } else {
+        logger.error(
+            'Erro em get/messages\n'
+            +'Passando headers em formato inapropriado'
+        );
         res.sendStatus(422);
     }
 });
@@ -155,17 +198,33 @@ app.delete('/messages/:messageId', async (req,res) => {
                     await messages.deleteOne({_id});
                     res.sendStatus(200);
                 } else {
+                    logger.error(
+                        'Erro em delete/messages/:id.\n'
+                        +'mensagem não pertence ao usuário passado'
+                    );
                     res.sendStatus(401);
                 }
             } else {
+                logger.error(
+                    'Erro em delete/messages/:id\n'
+                    +'_id da mensagem não encontrado'
+                );
                 res.sendStatus(404);
             }
         } catch (e) {
+            logger.error(
+                'Erro em delete/messages/:id\n'
+                +`${e}`
+            );
             res.sendStatus(404);
         } finally {
             mongo.close();
         }
     } else {
+        logger.error(
+            'Erro em delete/messages/:id.\n'
+            +'Passando headers em formato inapropriado'
+        );
         res.sendStatus(422);
     }
 });
@@ -186,6 +245,10 @@ app.put('/messages/:messageId', async (req,res) => {
             {abortEarly:true}
         );
         if (validation.error) {
+            logger.error(
+                'Erro em put/messages/:id.\n'
+                +'Passando body em formato inapropriado'
+            );
             return res.sendStatus(422);
         } else {
             try {
@@ -201,18 +264,34 @@ app.put('/messages/:messageId', async (req,res) => {
                         );
                         res.sendStatus(200);
                     } else {
+                        logger.error(
+                            'Erro em put/messages/:id.\n'
+                            +'mensagem não pertence ao usuário passado'
+                        );
                         res.sendStatus(401);
                     }
                 } else {
+                    logger.error(
+                        'Erro em put/messages/:id.\n'
+                        +'_id da mensagem não encontrado'
+                    );
                     res.sendStatus(404);
                 }
             } catch (e) {
+                logger.error(
+                    'Erro em put/messages/:id\n'
+                    +`${e}`
+                );
                 res.sendStatus(500);
             } finally {
                 mongo.close();
             }
         }
     } else {
+        logger.error(
+            'Erro em put/messages/:id.\n'
+            +'Passando headers em formato inapropriado'
+        );
         return res.sendStatus(422);
     }
 });
@@ -224,6 +303,10 @@ app.post('/status', async (req,res) => {
         name = removeHTML(name).trim();
         const validation = nameSchema.validate({name},{abortEarly:true});
         if (validation.error) {
+            logger.error(
+                'Erro em post/status.\n'
+                +'Passando headers em formato inapropriado'
+            );
             return res.sendStatus(422);
         } else {
             try {
@@ -238,15 +321,27 @@ app.post('/status', async (req,res) => {
                     res.sendStatus(200);
                 } else {
                     mongo.close();
+                    logger.error(
+                        'Erro em post/status\n'
+                        +'Usuário inexistente'
+                    );
                     return res.sendStatus(404);
                 }
             } catch (e) {
+                logger.error(
+                    'Erro em post/status\n'
+                    +`${e}`
+                );
                 res.sendStatus(500);
             } finally {
                 mongo.close();
             }
         }
     } else {
+        logger.error(
+            'Erro em post/status.\n'
+            +'Passando headers em formato inapropriado'
+        );
         return res.sendStatus(422);
     }
 });

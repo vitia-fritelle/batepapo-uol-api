@@ -2,6 +2,7 @@ import { Collection, MongoClient } from "mongodb";
 import { Message, Participant } from "../entities";
 import { stripHtml } from 'string-strip-html';
 import {config as dotenvConfig} from 'dotenv';
+import logger from "../logging";
 
 dotenvConfig();
 
@@ -58,7 +59,10 @@ export const autoRemove = async () => {
             await messages.insertMany(exitMessages);
         } 
     } catch (e) {
-        console.log(e);
+        logger.error(
+            'Erro na remoção automática\n'
+            +`${e}`
+        );
     } finally {
         mongo.close()
     }
