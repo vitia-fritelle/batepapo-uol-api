@@ -1,8 +1,11 @@
 import { Collection, MongoClient } from "mongodb";
 import { Message, Participant } from "../entities";
 import { stripHtml } from 'string-strip-html';
+import {config as dotenvConfig} from 'dotenv';
 
-const mongo_url = 'mongodb://localhost:27017';
+dotenvConfig();
+
+const mongo_url = process.env.MONGO_URL || 'mongodb://localhost:27017';
 const mongo = new MongoClient(mongo_url);
 
 export default mongo;
@@ -16,7 +19,9 @@ export const existsParticipant = async (
 
 export const getParticipants = () => {
 
-    const participants = mongo.db('batepapo-uol').collection<Participant>('participants');
+    const participants = (
+        mongo.db('batepapo-uol').collection<Participant>('participants')
+    );
     return participants;
 };
 
@@ -30,7 +35,9 @@ export const removeHTML = (name: string) => stripHtml(name).result;
 
 export const getParticipantsNames = async () => {
     await mongo.connect();
-    const result = (await getParticipants().find().toArray()).map(({name}) => name);
+    const result = (
+        await getParticipants().find().toArray()
+    ).map(({name}) => name);
     mongo.close();
     return result;
 };

@@ -7,7 +7,8 @@ import {Message, Participant} from './entities';
 import {config as dotenvConfig} from 'dotenv';
 import {json} from 'express';
 import {messageSchema, nameSchema} from './schemas';
-import {existsParticipant, getMessages, getParticipants, removeHTML, autoRemove} from './utils';
+import {existsParticipant, getMessages, getParticipants, 
+    removeHTML, autoRemove} from './utils';
 
 dotenvConfig();
 
@@ -120,7 +121,7 @@ app.get('/messages', async (req, res) => {
             ]};
             const userMessages = await messages.find(conditions).toArray();
             if (typeof limit === 'string') {
-                const end = userMessages.length-1;
+                const end = userMessages.length;
                 const start = end-parseInt(limit);
                 const result = userMessages.slice(start,end);
                 res.status(201).send(result);
@@ -196,7 +197,7 @@ app.put('/messages/:messageId', async (req,res) => {
                     if (message.from === from) {
                         await messages.updateOne(
                             {_id},
-                            new Message(from,to,text,type)
+                            {$set: new Message(from,to,text,type)}
                         );
                         res.sendStatus(200);
                     } else {
@@ -232,7 +233,7 @@ app.post('/status', async (req,res) => {
                 if (user) {
                     await participants.updateOne(
                         {_id: user._id},
-                        {$set: {lastStatus: Date.now()}}
+                        {$set: new Participant(name)}
                     );
                     res.sendStatus(200);
                 } else {
